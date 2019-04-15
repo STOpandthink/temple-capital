@@ -33,7 +33,6 @@ def get_price_changes(df: pd.DataFrame) -> pd.DataFrame:
     df: pd.DataFrame = df.copy()
     df["pct_change"] = df["close"].pct_change()
     df['price_change'] = df.close / df.close.shift(1)
-    df['short_price_change'] = 2 - df.price_change
     return df
 
 
