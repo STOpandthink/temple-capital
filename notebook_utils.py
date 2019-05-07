@@ -98,6 +98,7 @@ def graph_strategy(dfs, options=None):
         if isinstance(columns, str):
             columns = [col]
         started = False
+        column_names = []
         for c in columns:
             if isinstance(c, str) and c in dfs[0]:
                 if not started:
@@ -105,6 +106,9 @@ def graph_strategy(dfs, options=None):
                     graph_assistant.new_plot()
                     plt.ylabel(c)
                 plt.plot(dfs[0][c])
+                column_names.append(c)
+        if len(column_names) > 1:
+            plt.legend(tuple(column_names))
 
     graph_assistant.new_plot()
     plt.ylabel("Coin price")
