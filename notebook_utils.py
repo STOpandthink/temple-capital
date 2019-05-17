@@ -11,7 +11,7 @@ from scipy.stats import gmean
 fees = 0.00075
 
 
-def load_time_bars_df(coin: str, exchange_name: str = "bitmex") -> pd.DataFrame:
+def load_time_bars_df(coin: str, exchange_name: str = "bitmex", bar_size: str = "days") -> pd.DataFrame:
     """
     Return minute dataframes for the given coin.
     :param coin: coin to load
@@ -20,7 +20,7 @@ def load_time_bars_df(coin: str, exchange_name: str = "bitmex") -> pd.DataFrame:
     :param exchange_name: name of the exchange to use as the data source
     :return: the loaded dataframe
     """
-    df = pd.read_csv(f'days_{coin}_{exchange_name}.csv')
+    df = pd.read_csv(f'{bar_size}_{coin}_{exchange_name}.csv')
     df["open_date"] = pd.to_datetime(df["open_date"], utc=True)
     df["close_date"] = pd.to_datetime(df["close_date"], utc=True)
     df["index"] = df["open_date"]
