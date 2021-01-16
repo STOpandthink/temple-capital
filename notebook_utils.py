@@ -11,7 +11,7 @@ from scipy.stats import gmean
 fees = 0.00075
 
 
-def load_time_bars_df(coin: str, exchange_name: str = "bitmex", bar_size: str = "days") -> pd.DataFrame:
+def load_time_bars_df(coin: str, exchange_name: str = "bitmex", bar_size: str = "days", use_hdf=False) -> pd.DataFrame:
     """
     Return minute dataframes for the given coin.
     :param coin: coin to load
@@ -20,7 +20,10 @@ def load_time_bars_df(coin: str, exchange_name: str = "bitmex", bar_size: str = 
     :param exchange_name: name of the exchange to use as the data source
     :return: the loaded dataframe
     """
-    df = pd.read_csv(f'{bar_size}_{coin}_{exchange_name}.csv')
+    if use_hdf:
+        df = pd.read_hdf(f'bitmex_1h_btc_usd.hdf')
+    else:
+        df = pd.read_csv(f'{bar_size}_{coin}_{exchange_name}.csv')
     df["open_date"] = pd.to_datetime(df["open_date"], utc=True)
     df["close_date"] = pd.to_datetime(df["close_date"], utc=True)
     df["index"] = df["open_date"]
@@ -140,6 +143,29 @@ def graph_strategy(dfs, options=None):
     graph_assistant.show()
 
 
+def seconds_in_a_bar(df: pd.DataFrame) -> int:
+    # Note: not taking the last index, because it could be weirdly truncated
+    return (df.index[-2] - df.index[-3]).total_seconds()
+
+
+seconds_per_hour: int = 3600
+seconds_per_day: int = seconds_per_hour * 24
+seconds_per_year: int = 365 * seconds_per_day
+def compute_sr(seconds_per_bar: int, series, risk_free_rate: float = 0.0, convert_to_hourly: bool = True) -> float:
+    # Note: you can use risk_free_rate = .03
+    if convert_to_hourly:
+        returns = series.groupby(pd.Grouper(freq="H")).prod()
+        seconds_per_bar = 60 * 60
+    else:
+        returns = series
+    bars_per_year = seconds_per_year / seconds_per_bar
+    avg_per_bar_return = gmean(returns) - 1
+    per_bar_risk_free_rate = ((1 + risk_free_rate) ** (1 / bars_per_year)) - 1
+    per_bar_std = np.std(returns, ddof=1)
+    per_bar_sharpe_ratio = 0 if per_bar_std == 0 else (avg_per_bar_return - per_bar_risk_free_rate) / per_bar_std
+    return per_bar_sharpe_ratio * (bars_per_year ** .5)
+
+
 def analyze(simulation_results_list, options=None) -> Union[List, Dict]:
     if options is None:
         options = dict()
@@ -206,13 +232,7 @@ def analyze(simulation_results_list, options=None) -> Union[List, Dict]:
             return (returns.cumprod() * (1 - fees) ** turnover(signal).cumsum()).fillna(1)
 
         def compute_sr_from_returns(returns) -> float:
-            bars_per_day = options.get("bars_per_day", 24)
-            risk_free_rate = .03
-            avg_per_bar_return = gmean(returns) - 1
-            per_bar_risk_free_rate = ((1 + risk_free_rate) ** (1 / (365 * bars_per_day))) - 1
-            per_bar_std = returns.std()
-            per_bar_sharpe_ratio = 0 if per_bar_std == 0 else (avg_per_bar_return - per_bar_risk_free_rate) / per_bar_std
-            return per_bar_sharpe_ratio * ((365 * bars_per_day) ** .5)
+            return compute_sr(seconds_in_a_bar(filtered_df), returns)
 
         def compute_sr_from_returns_less_fees(returns, signal):
             cumprod_returns = cumprod_returns_less_fees(returns, signal)
